@@ -6,6 +6,18 @@ pub mod imp;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Number(i32);
 
+impl PartialEq<i32> for Number {
+    fn eq(&self, other: &i32) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<Number> for i32 {
+    fn eq(&self, other: &Number) -> bool {
+        *self == other.0
+    }
+}
+
 impl From<i32> for Number {
     fn from(n: i32) -> Self {
         Number(n)
