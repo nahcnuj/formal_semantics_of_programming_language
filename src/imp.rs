@@ -1,23 +1,20 @@
+//! プログラミング言語 IMP
+//!
+//! ```text
+//! N    ::= 整数
+//! T    ::= "true" | "false"
+//! Loc  ::= プログラム変数（X,Y,Z,...）
+//!
+//! Aexp ::= N | Loc | Aexp "+" Aexp | Aexp "-" Aexp | Aexp "*" Aexp
+//! Bexp ::= T | Aexp "=" Aexp | Aexp "<=" Aexp | "not" Bexp | Bexp "and" Bexp | Bexp "or" Bexp
+//! Com  ::= "skip" | Loc ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
+//! ```
+
 use crate::{Number, State, Truth, VarName};
 
 /// プログラミング言語 IMP の構文解析木
-///
-/// ```text
-/// IMP  ::= N | T | Loc | Aexp | Bexp | Com
-/// N    ::= 整数
-/// T    ::= "true" | "false"
-/// Loc  ::= プログラム変数（X,Y,Z,...）
-///
-/// Aexp ::= N | Loc | Aexp "+" Aexp | Aexp "-" Aexp | Aexp "*" Aexp
-/// Bexp ::= T | Aexp "=" Aexp | Aexp "<=" Aexp | "not" Bexp | Bexp "and" Bexp | Bexp "or" Bexp
-/// Com  ::= "skip" | Loc ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
-/// ```
 #[derive(Debug, PartialEq)]
-pub enum IMP {
-    Aexp(Aexp),
-    Bexp(Bexp),
-    Com(Com),
-}
+pub struct IMP(Com);
 
 #[derive(Debug, PartialEq)]
 pub enum Aexp {
@@ -65,35 +62,23 @@ pub enum Com {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        imp::{Aexp, IMP},
-        State,
-    };
+    use crate::{imp::Aexp, State};
 
     #[test]
     fn equals() {
         // 3 ≡ 3
-        assert_eq!(IMP::Aexp(Aexp::N(3.into())), IMP::Aexp(Aexp::N(3.into())));
+        assert_eq!(Aexp::N(3.into()), Aexp::N(3.into()));
 
         // ¬( 8 ≡ 3 + 5 )
         assert_ne!(
-            IMP::Aexp(Aexp::N(8.into())),
-            IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(3.into())),
-                Box::new(Aexp::N(5.into()))
-            ))
+            Aexp::N(8.into()),
+            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into())))
         );
 
         // ¬( 5 + 3 ≡ 3 + 5 )
         assert_ne!(
-            IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(5.into())),
-                Box::new(Aexp::N(3.into()))
-            )),
-            IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(3.into())),
-                Box::new(Aexp::N(5.into()))
-            ))
+            Aexp::Add(Box::new(Aexp::N(5.into())), Box::new(Aexp::N(3.into()))),
+            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into())))
         );
     }
 
