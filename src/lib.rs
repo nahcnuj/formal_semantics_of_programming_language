@@ -6,6 +6,12 @@ pub mod imp;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Number(i32);
 
+impl From<i32> for Number {
+    fn from(n: i32) -> Self {
+        Number(n)
+    }
+}
+
 /// 真偽値
 #[derive(Debug, PartialEq)]
 pub struct Truth(bool);
@@ -13,6 +19,12 @@ pub struct Truth(bool);
 /// プログラム変数
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VarName(String);
+
+impl From<&str> for VarName {
+    fn from(name: &str) -> Self {
+        VarName(name.to_string())
+    }
+}
 
 impl fmt::Display for VarName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -31,7 +43,7 @@ impl State {
     pub fn from(defs: &[(&str, Number)]) -> State {
         let mut vars = HashMap::new();
         for def in defs {
-            vars.insert(VarName(def.0.to_string()), Some(def.1));
+            vars.insert(VarName::from(def.0), Some(def.1));
         }
         State(vars)
     }

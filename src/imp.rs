@@ -31,17 +31,15 @@ pub enum Aexp {
 impl Aexp {
     pub fn evaluate(&self, state: &State) -> Number {
         match &self {
-            Aexp::N(n) => Number(n.0),
-            Aexp::Loc(var) => Number(
-                state
-                    .get(var)
-                    .as_ref()
-                    .expect(format!("variable {} is undefined", var).as_str())
-                    .0,
-            ),
-            Aexp::Add(left, right) => Number(left.evaluate(&state).0 + right.evaluate(&state).0),
-            Aexp::Sub(left, right) => Number(left.evaluate(&state).0 - right.evaluate(&state).0),
-            Aexp::Mul(left, right) => Number(left.evaluate(&state).0 * right.evaluate(&state).0),
+            Aexp::N(n) => n.0.into(),
+            Aexp::Loc(var) => state
+                .get(var)
+                .as_ref()
+                .expect(format!("variable {} is undefined", var).as_str())
+                .to_owned(),
+            Aexp::Add(left, right) => (left.evaluate(&state).0 + right.evaluate(&state).0).into(),
+            Aexp::Sub(left, right) => (left.evaluate(&state).0 - right.evaluate(&state).0).into(),
+            Aexp::Mul(left, right) => (left.evaluate(&state).0 * right.evaluate(&state).0).into(),
         }
     }
 }
@@ -69,32 +67,32 @@ pub enum Com {
 mod tests {
     use crate::{
         imp::{Aexp, IMP},
-        Number, State, VarName,
+        Number, State,
     };
 
     #[test]
     fn equals() {
         // 3 ≡ 3
-        assert_eq!(IMP::Aexp(Aexp::N(Number(3))), IMP::Aexp(Aexp::N(Number(3))));
+        assert_eq!(IMP::Aexp(Aexp::N(3.into())), IMP::Aexp(Aexp::N(3.into())));
 
         // ¬( 8 ≡ 3 + 5 )
         assert_ne!(
-            IMP::Aexp(Aexp::N(Number(8))),
+            IMP::Aexp(Aexp::N(8.into())),
             IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(Number(3))),
-                Box::new(Aexp::N(Number(5)))
+                Box::new(Aexp::N(3.into())),
+                Box::new(Aexp::N(5.into()))
             ))
         );
 
         // ¬( 5 + 3 ≡ 3 + 5 )
         assert_ne!(
             IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(Number(5))),
-                Box::new(Aexp::N(Number(3)))
+                Box::new(Aexp::N(5.into())),
+                Box::new(Aexp::N(3.into()))
             )),
             IMP::Aexp(Aexp::Add(
-                Box::new(Aexp::N(Number(3))),
-                Box::new(Aexp::N(Number(5)))
+                Box::new(Aexp::N(3.into())),
+                Box::new(Aexp::N(5.into()))
             ))
         );
     }
@@ -104,20 +102,17 @@ mod tests {
         let state = State::init();
 
         // 〈2, σ〉 → 2
-        assert_eq!(Number(2), Aexp::N(Number(2)).evaluate(&state));
+        assert_eq!(Number(2), Aexp::N(2.into()).evaluate(&state));
 
         // 〈5, σ〉 → 5
-        assert_eq!(Number(5), Aexp::N(Number(5)).evaluate(&state));
+        assert_eq!(Number(5), Aexp::N(5.into()).evaluate(&state));
     }
 
     #[test]
     fn evaluate_variable() {
         // 〈Init, σ_0〉 → 0
-        let state = State::from(&[("Init", Number(0))]);
-        assert_eq!(
-            Number(0),
-            Aexp::Loc(VarName(String::from("Init"))).evaluate(&state),
-        );
+        let state = State::from(&[("Init", 0.into())]);
+        assert_eq!(Number(0), Aexp::Loc("Init".into()).evaluate(&state));
     }
 
     #[test]
@@ -126,32 +121,32 @@ mod tests {
         let state = State::init();
         assert_eq!(
             Number(16),
-            Aexp::Add(Box::new(Aexp::N(Number(7))), Box::new(Aexp::N(Number(9)))).evaluate(&state),
+            Aexp::Add(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
         );
 
         // 〈Init + 5, σ_0〉 → 5
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(5),
             Aexp::Add(
-                Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                Box::new(Aexp::N(Number(5)))
+                Box::new(Aexp::Loc("Init".into())),
+                Box::new(Aexp::N(5.into()))
             )
             .evaluate(&state),
         );
 
         // 〈(Init + 5) + (7 + 9), σ_0〉 → 21
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(21),
             Aexp::Add(
                 Box::new(Aexp::Add(
-                    Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                    Box::new(Aexp::N(Number(5)))
+                    Box::new(Aexp::Loc("Init".into())),
+                    Box::new(Aexp::N(5.into()))
                 )),
                 Box::new(Aexp::Add(
-                    Box::new(Aexp::N(Number(7))),
-                    Box::new(Aexp::N(Number(9)))
+                    Box::new(Aexp::N(7.into())),
+                    Box::new(Aexp::N(9.into()))
                 )),
             )
             .evaluate(&state),
@@ -164,32 +159,32 @@ mod tests {
         let state = State::init();
         assert_eq!(
             Number(-2),
-            Aexp::Sub(Box::new(Aexp::N(Number(7))), Box::new(Aexp::N(Number(9)))).evaluate(&state),
+            Aexp::Sub(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
         );
 
         // 〈Init - 5, σ_0〉 → -5
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(-5),
             Aexp::Sub(
-                Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                Box::new(Aexp::N(Number(5)))
+                Box::new(Aexp::Loc("Init".into())),
+                Box::new(Aexp::N(5.into()))
             )
             .evaluate(&state),
         );
 
         // 〈(Init - 5) - (7 - 9), σ_0〉 → -3
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(-3),
             Aexp::Sub(
                 Box::new(Aexp::Sub(
-                    Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                    Box::new(Aexp::N(Number(5)))
+                    Box::new(Aexp::Loc("Init".into())),
+                    Box::new(Aexp::N(5.into()))
                 )),
                 Box::new(Aexp::Sub(
-                    Box::new(Aexp::N(Number(7))),
-                    Box::new(Aexp::N(Number(9)))
+                    Box::new(Aexp::N(7.into())),
+                    Box::new(Aexp::N(9.into()))
                 )),
             )
             .evaluate(&state),
@@ -202,32 +197,32 @@ mod tests {
         let state = State::init();
         assert_eq!(
             Number(63),
-            Aexp::Mul(Box::new(Aexp::N(Number(7))), Box::new(Aexp::N(Number(9)))).evaluate(&state),
+            Aexp::Mul(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
         );
 
         // 〈Init * 5, σ_0〉 → 0
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(0),
             Aexp::Mul(
-                Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                Box::new(Aexp::N(Number(5)))
+                Box::new(Aexp::Loc("Init".into())),
+                Box::new(Aexp::N(5.into()))
             )
             .evaluate(&state),
         );
 
         // 〈(Init * 5) * (7 * 9), σ_0〉 → 0
-        let state = State::from(&[("Init", Number(0))]);
+        let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
             Number(0),
             Aexp::Mul(
                 Box::new(Aexp::Mul(
-                    Box::new(Aexp::Loc(VarName(String::from("Init")))),
-                    Box::new(Aexp::N(Number(5)))
+                    Box::new(Aexp::Loc("Init".into())),
+                    Box::new(Aexp::N(5.into()))
                 )),
                 Box::new(Aexp::Mul(
-                    Box::new(Aexp::N(Number(7))),
-                    Box::new(Aexp::N(Number(9)))
+                    Box::new(Aexp::N(7.into())),
+                    Box::new(Aexp::N(9.into()))
                 )),
             )
             .evaluate(&state),
