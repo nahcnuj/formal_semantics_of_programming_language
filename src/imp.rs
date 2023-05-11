@@ -16,12 +16,18 @@ use crate::{Number, State, Truth, VarName};
 #[derive(Debug, PartialEq)]
 pub struct IMP(Com);
 
+/// 算術式
 #[derive(Debug, PartialEq)]
 pub enum Aexp {
+    /// 整数 n
     N(Number),
+    /// プログラム変数 `X`
     Loc(VarName),
+    /// 加算 `a_0 + a_1`
     Add(Box<Aexp>, Box<Aexp>),
+    /// 減算 `a_0 - a_1`
     Sub(Box<Aexp>, Box<Aexp>),
+    /// 乗算 `a_0 * a_1`
     Mul(Box<Aexp>, Box<Aexp>),
 }
 
@@ -41,22 +47,35 @@ impl Aexp {
     }
 }
 
+/// ブール式
 #[derive(Debug, PartialEq)]
 pub enum Bexp {
+    /// 真偽値 `true`, `false`
     T(Truth),
+    /// 等値比較 `a_0 = a_1`
     Eq(Aexp, Aexp),
+    /// より小さいか等しい `a_0 <= a_1`
     Le(Aexp, Aexp),
+    /// 否定 `not b`
     Not(Box<Bexp>),
+    /// 論理積 `b_0 and b_1`
     And(Box<Bexp>, Box<Bexp>),
+    /// 論理和 `b_0 or b_1`
     Or(Box<Bexp>, Box<Bexp>),
 }
 
+/// コマンド
 #[derive(Debug, PartialEq)]
 pub enum Com {
+    /// 基礎コマンド
     Skip,
+    /// 代入 `X := a`
     Subst(VarName, Aexp),
+    /// 逐次実行 `c_0 ; c_1`
     Seq(Box<Com>, Box<Com>),
+    /// 条件分岐 `if b then c_0 else c_1`
     If(Bexp, Box<Com>, Box<Com>),
+    /// whileループ `while b do c`
     While(Bexp, Box<Com>),
 }
 
