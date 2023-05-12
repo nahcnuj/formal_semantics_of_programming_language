@@ -48,7 +48,69 @@ impl Evaluate<Number> for Aexp {
 
 /// ブール式
 #[derive(Debug, PartialEq)]
-pub enum Bexp {
+pub struct Bexp {
+    bexp: BexpImpl,
+}
+
+impl Bexp {
+    /// 真偽値 `true`, `false`
+    #[inline]
+    pub fn truth(b: bool) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::T(b.into()),
+        }
+    }
+
+    /// 等値比較 `a_0 = a_1`
+    #[inline]
+    pub fn eq(left: Aexp, right: Aexp) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::Eq(left, right),
+        }
+    }
+
+    /// より小さいか等しい `a_0 <= a_1`
+    #[inline]
+    pub fn le(left: Aexp, right: Aexp) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::Le(left, right),
+        }
+    }
+
+    /// 否定 `not b`
+    #[inline]
+    pub fn not(expr: Bexp) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::Not(Box::new(expr.bexp)),
+        }
+    }
+
+    /// 論理積 `b_0 and b_1`
+    #[inline]
+    pub fn and(left: Bexp, right: Bexp) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::And(Box::new(left.bexp), Box::new(right.bexp)),
+        }
+    }
+
+    /// 論理和 `b_0 or b_1`
+    #[inline]
+    pub fn or(left: Bexp, right: Bexp) -> Bexp {
+        Bexp {
+            bexp: BexpImpl::Or(Box::new(left.bexp), Box::new(right.bexp)),
+        }
+    }
+}
+
+impl Evaluate<Truth> for Bexp {
+    fn evaluate(&self, state: &State) -> Truth {
+        self.bexp.evaluate(&state)
+    }
+}
+
+/// ブール式
+#[derive(Debug, PartialEq)]
+enum BexpImpl {
     /// 真偽値 `true`, `false`
     T(Truth),
     /// 等値比較 `a_0 = a_1`
@@ -56,28 +118,37 @@ pub enum Bexp {
     /// より小さいか等しい `a_0 <= a_1`
     Le(Aexp, Aexp),
     /// 否定 `not b`
-    Not(Box<Bexp>),
+    Not(Box<BexpImpl>),
     /// 論理積 `b_0 and b_1`
-    And(Box<Bexp>, Box<Bexp>),
+    And(Box<BexpImpl>, Box<BexpImpl>),
     /// 論理和 `b_0 or b_1`
-    Or(Box<Bexp>, Box<Bexp>),
+    Or(Box<BexpImpl>, Box<BexpImpl>),
+
+    /// 短絡評価のテスト用（evaluates すると panic する）
+    #[allow(dead_code)]
+    Dummy,
 }
 
-impl Evaluate<Truth> for Bexp {
+impl Evaluate<Truth> for BexpImpl {
     fn evaluate(&self, state: &State) -> Truth {
         match &self {
-            Bexp::T(Truth(true)) => Truth(true),
-            Bexp::T(Truth(false)) => Truth(false),
-            Bexp::Eq(left, right) if left.evaluate(&state) == right.evaluate(&state) => Truth(true),
-            Bexp::Eq(_, _) => Truth(false),
-            Bexp::Le(left, right) if left.evaluate(&state) <= right.evaluate(&state) => Truth(true),
-            Bexp::Le(_, _) => Truth(false),
-            Bexp::Not(b) if b.evaluate(&state).0 => Truth(false),
-            Bexp::Not(_) => Truth(true),
-            Bexp::And(left, _) if !left.evaluate(&state).0 => Truth(false),
-            Bexp::And(_, right) => right.evaluate(&state),
-            Bexp::Or(left, _) if left.evaluate(&state).0 => Truth(true),
-            Bexp::Or(_, right) => right.evaluate(&state),
+            BexpImpl::T(Truth(true)) => Truth(true),
+            BexpImpl::T(Truth(false)) => Truth(false),
+            BexpImpl::Eq(left, right) if left.evaluate(&state) == right.evaluate(&state) => {
+                Truth(true)
+            }
+            BexpImpl::Eq(_, _) => Truth(false),
+            BexpImpl::Le(left, right) if left.evaluate(&state) <= right.evaluate(&state) => {
+                Truth(true)
+            }
+            BexpImpl::Le(_, _) => Truth(false),
+            BexpImpl::Not(b) if b.evaluate(&state).0 => Truth(false),
+            BexpImpl::Not(_) => Truth(true),
+            BexpImpl::And(left, _) if !left.evaluate(&state).0 => Truth(false),
+            BexpImpl::And(_, right) => right.evaluate(&state),
+            BexpImpl::Or(left, _) if left.evaluate(&state).0 => Truth(true),
+            BexpImpl::Or(_, right) => right.evaluate(&state),
+            _ => panic!(),
         }
     }
 }
@@ -100,7 +171,7 @@ pub enum Com {
 #[cfg(test)]
 mod tests {
     use crate::{
-        imp::{Aexp, Bexp},
+        imp::{Aexp, BexpImpl},
         Evaluate, State,
     };
 
@@ -259,10 +330,10 @@ mod tests {
         let state = State::init();
 
         // 〈true, σ〉 → true
-        assert_eq!(true, Bexp::T(true.into()).evaluate(&state),);
+        assert_eq!(true, BexpImpl::T(true.into()).evaluate(&state),);
 
         // 〈false, σ〉 → false
-        assert_eq!(false, Bexp::T(false.into()).evaluate(&state),);
+        assert_eq!(false, BexpImpl::T(false.into()).evaluate(&state),);
     }
 
     #[test]
@@ -272,13 +343,13 @@ mod tests {
         // 〈0 = 0, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Eq(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
+            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
         );
 
         // 〈0 = 1, σ〉 → false
         assert_eq!(
             false,
-            Bexp::Eq(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
+            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
         )
     }
 
@@ -289,19 +360,19 @@ mod tests {
         // 〈0 <= 0, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Le(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
+            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
         );
 
         // 〈0 <= 1, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Le(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
+            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
         );
 
         // 〈1 <= 0, σ〉 → false
         assert_eq!(
             false,
-            Bexp::Le(Aexp::N(1.into()), Aexp::N(0.into())).evaluate(&state),
+            BexpImpl::Le(Aexp::N(1.into()), Aexp::N(0.into())).evaluate(&state),
         );
     }
 
@@ -312,13 +383,13 @@ mod tests {
         // 〈not true, σ〉 → false
         assert_eq!(
             false,
-            Bexp::Not(Box::new(Bexp::T(true.into()))).evaluate(&state),
+            BexpImpl::Not(Box::new(BexpImpl::T(true.into()))).evaluate(&state),
         );
 
         // 〈not false, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Not(Box::new(Bexp::T(false.into()))).evaluate(&state),
+            BexpImpl::Not(Box::new(BexpImpl::T(false.into()))).evaluate(&state),
         );
     }
 
@@ -329,28 +400,27 @@ mod tests {
         // 〈false and b_1, σ〉 → false
         assert_eq!(
             false,
-            Bexp::And(
-                Box::new(Bexp::T(false.into())),
-                Box::new(Bexp::T(false.into()))
+            BexpImpl::And(
+                Box::new(BexpImpl::T(false.into())),
+                Box::new(BexpImpl::Dummy),
             )
             .evaluate(&state),
         );
         assert_eq!(
             false,
-            Bexp::And(
-                Box::new(Bexp::T(false.into())),
-                Box::new(Bexp::T(true.into()))
+            BexpImpl::And(
+                Box::new(BexpImpl::T(false.into())),
+                Box::new(BexpImpl::Dummy),
             )
             .evaluate(&state),
         );
-        // TODO: 右辺の Bexp が evaluate されないことをテストしたい
 
         // 〈true and false, σ〉 → false
         assert_eq!(
             false,
-            Bexp::And(
-                Box::new(Bexp::T(true.into())),
-                Box::new(Bexp::T(false.into()))
+            BexpImpl::And(
+                Box::new(BexpImpl::T(true.into())),
+                Box::new(BexpImpl::T(false.into()))
             )
             .evaluate(&state),
         );
@@ -358,9 +428,9 @@ mod tests {
         // 〈true and true, σ〉 → true
         assert_eq!(
             true,
-            Bexp::And(
-                Box::new(Bexp::T(true.into())),
-                Box::new(Bexp::T(true.into()))
+            BexpImpl::And(
+                Box::new(BexpImpl::T(true.into())),
+                Box::new(BexpImpl::T(true.into()))
             )
             .evaluate(&state),
         );
@@ -373,28 +443,27 @@ mod tests {
         // 〈true or b_1, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Or(
-                Box::new(Bexp::T(true.into())),
-                Box::new(Bexp::T(false.into()))
+            BexpImpl::Or(
+                Box::new(BexpImpl::T(true.into())),
+                Box::new(BexpImpl::Dummy),
             )
             .evaluate(&state),
         );
         assert_eq!(
             true,
-            Bexp::Or(
-                Box::new(Bexp::T(true.into())),
-                Box::new(Bexp::T(true.into()))
+            BexpImpl::Or(
+                Box::new(BexpImpl::T(true.into())),
+                Box::new(BexpImpl::Dummy),
             )
             .evaluate(&state),
         );
-        // TODO: 右辺の Bexp が evaluate されないことをテストしたい
 
         // 〈false or true, σ〉 → true
         assert_eq!(
             true,
-            Bexp::Or(
-                Box::new(Bexp::T(false.into())),
-                Box::new(Bexp::T(true.into()))
+            BexpImpl::Or(
+                Box::new(BexpImpl::T(false.into())),
+                Box::new(BexpImpl::T(true.into()))
             )
             .evaluate(&state),
         );
@@ -402,9 +471,9 @@ mod tests {
         // 〈false or false, σ〉 → false
         assert_eq!(
             false,
-            Bexp::Or(
-                Box::new(Bexp::T(false.into())),
-                Box::new(Bexp::T(false.into()))
+            BexpImpl::Or(
+                Box::new(BexpImpl::T(false.into())),
+                Box::new(BexpImpl::T(false.into()))
             )
             .evaluate(&state),
         );
