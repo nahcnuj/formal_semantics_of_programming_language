@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 pub mod imp;
 
 /// 整数
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Number(i32);
 
 impl PartialEq<i32> for Number {
@@ -25,8 +25,20 @@ impl From<i32> for Number {
 }
 
 /// 真偽値
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Truth(bool);
+
+impl PartialEq<bool> for Truth {
+    fn eq(&self, other: &bool) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<Truth> for bool {
+    fn eq(&self, other: &Truth) -> bool {
+        *self == other.0
+    }
+}
 
 impl From<bool> for Truth {
     fn from(b: bool) -> Self {
