@@ -28,6 +28,12 @@ impl From<i32> for Number {
 #[derive(Debug, PartialEq)]
 pub struct Truth(bool);
 
+impl From<bool> for Truth {
+    fn from(b: bool) -> Self {
+        Truth(b)
+    }
+}
+
 /// プログラム変数
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VarName(String);
@@ -63,4 +69,9 @@ impl State {
     fn get(&self, var: &VarName) -> &Option<Number> {
         self.0.get(var).unwrap_or(&None)
     }
+}
+
+pub trait Evaluate<T> {
+    /// 与えられた状態のもとで自身を評価する
+    fn evaluate(&self, state: &State) -> T;
 }

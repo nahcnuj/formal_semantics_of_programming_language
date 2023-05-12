@@ -9,8 +9,7 @@
 //! Bexp ::= T | Aexp "=" Aexp | Aexp "<=" Aexp | "not" Bexp | Bexp "and" Bexp | Bexp "or" Bexp
 //! Com  ::= "skip" | Loc ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
 //! ```
-
-use crate::{Number, State, Truth, VarName};
+use crate::{Evaluate, Number, State, Truth, VarName};
 
 /// プログラミング言語 IMP の構文解析木
 #[derive(Debug, PartialEq)]
@@ -31,8 +30,8 @@ pub enum Aexp {
     Mul(Box<Aexp>, Box<Aexp>),
 }
 
-impl Aexp {
-    pub fn evaluate(&self, state: &State) -> Number {
+impl Evaluate<Number> for Aexp {
+    fn evaluate(&self, state: &State) -> Number {
         match &self {
             Aexp::N(n) => n.0.into(),
             Aexp::Loc(var) => state
@@ -81,7 +80,7 @@ pub enum Com {
 
 #[cfg(test)]
 mod tests {
-    use crate::{imp::Aexp, State};
+    use crate::{imp::Aexp, State, Evaluate};
 
     #[test]
     fn equals() {
