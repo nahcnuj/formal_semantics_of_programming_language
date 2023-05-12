@@ -2,7 +2,7 @@
 name = "formal_semantics_of_programming_language"
 version = "0.1.0"
 authors = ["Junichi Hayashi <2093896+nahcnuj@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
