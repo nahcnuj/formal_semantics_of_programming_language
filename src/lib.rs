@@ -66,10 +66,12 @@ impl fmt::Display for VarName {
 pub struct State(HashMap<VarName, Option<Number>>);
 
 impl State {
+    /// 初期状態を生成します。
     pub fn init() -> State {
         State(HashMap::new())
     }
 
+    /// 変数名と値の組のスライスから状態を生成します。
     pub fn from(defs: &[(&str, Number)]) -> State {
         let mut vars = HashMap::new();
         for def in defs {
@@ -78,12 +80,13 @@ impl State {
         State(vars)
     }
 
+    /// この状態での変数 `var` の値を返します。
     fn get(&self, var: &VarName) -> &Option<Number> {
         self.0.get(var).unwrap_or(&None)
     }
 }
 
 pub trait Evaluate<T> {
-    /// 与えられた状態のもとで自身を評価する
+    /// 与えられた状態のもとで自身を評価します。
     fn evaluate(&self, state: &State) -> T;
 }
