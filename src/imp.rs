@@ -1,19 +1,16 @@
 //! プログラミング言語 IMP
 //!
 //! ```text
-//! N    ::= 整数
-//! T    ::= "true" | "false"
-//! Loc  ::= プログラム変数（X,Y,Z,...）
-//!
-//! Aexp ::= N | Loc | Aexp "+" Aexp | Aexp "-" Aexp | Aexp "*" Aexp
-//! Bexp ::= T | Aexp "=" Aexp | Aexp "<=" Aexp | "not" Bexp | Bexp "and" Bexp | Bexp "or" Bexp
-//! Com  ::= "skip" | Loc ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
+//! Aexp ::= Number | VarName | Aexp "+" Aexp | Aexp "-" Aexp | Aexp "*" Aexp
+//! Bexp ::= Truth | Aexp "=" Aexp | Aexp "<=" Aexp | "not" Bexp | Bexp "and" Bexp | Bexp "or" Bexp
+//! Com  ::= "skip" | VarName ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
 //! ```
+
 use crate::{Evaluate, Number, State, Truth, VarName};
 
-/// プログラミング言語 IMP の構文解析木
+/// プログラミング言語 IMP の抽象構文木 (Abstract Syntax Tree)
 #[derive(Debug, PartialEq)]
-pub struct IMP(Com);
+pub struct AST(Com);
 
 /// 算術式
 #[derive(Debug, PartialEq)]

@@ -1,8 +1,9 @@
 use std::{collections::HashMap, fmt};
 
-pub mod imp;
-
 /// 整数
+/// ```text
+/// Number ::= 整数
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Number(i32);
 
@@ -46,6 +47,9 @@ impl From<i32> for Number {
 }
 
 /// 真偽値
+/// ```text
+/// Truth ::= "true" | "false"
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Truth(bool);
 
@@ -80,7 +84,10 @@ impl From<Truth> for bool {
     }
 }
 
-/// プログラム変数
+/// 変数
+/// ```text
+/// VarName ::= 変数（X,Y,Z,...）
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VarName(String);
 
@@ -131,3 +138,5 @@ pub trait Evaluate<T> {
     /// 与えられた状態のもとで自身を評価します。
     fn evaluate(&self, state: State) -> (T, State);
 }
+
+pub mod imp;
