@@ -202,7 +202,7 @@ impl Execute for Com {
 
         let mut cmd = self.clone();
         let mut state = state;
-        while {
+        loop {
             let (rest, new_state) = match &cmd {
                 Com::Skip => (None, state),
                 Com::Subst(var, a) => {
@@ -242,11 +242,10 @@ impl Execute for Com {
 
             if let Some(rest) = rest {
                 cmd = rest.as_ref().clone();
-                true
             } else {
-                false
+                break;
             }
-        } {}
+        }
         (None, state)
     }
 }
