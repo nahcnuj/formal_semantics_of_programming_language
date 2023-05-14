@@ -6,6 +6,27 @@ pub mod imp;
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Number(i32);
 
+impl std::ops::Add for Number {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.0 + rhs.0).into()
+    }
+}
+
+impl std::ops::Sub for Number {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        (self.0 - rhs.0).into()
+    }
+}
+
+impl std::ops::Mul for Number {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        (self.0 * rhs.0).into()
+    }
+}
+
 impl PartialEq<i32> for Number {
     fn eq(&self, other: &i32) -> bool {
         self.0 == *other
@@ -28,6 +49,13 @@ impl From<i32> for Number {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Truth(bool);
 
+impl std::ops::Not for Truth {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        (!self.0).into()
+    }
+}
+
 impl PartialEq<bool> for Truth {
     fn eq(&self, other: &bool) -> bool {
         self.0 == *other
@@ -46,13 +74,25 @@ impl From<bool> for Truth {
     }
 }
 
+impl From<Truth> for bool {
+    fn from(value: Truth) -> Self {
+        value.0
+    }
+}
+
 /// プログラム変数
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VarName(String);
 
 impl From<&str> for VarName {
     fn from(name: &str) -> Self {
         VarName(name.to_string())
+    }
+}
+
+impl From<String> for VarName {
+    fn from(name: String) -> Self {
+        VarName(name)
     }
 }
 
@@ -63,6 +103,7 @@ impl fmt::Display for VarName {
 }
 
 /// 状態
+#[derive(Debug, Clone, PartialEq)]
 pub struct State(HashMap<VarName, Option<Number>>);
 
 impl State {
@@ -88,5 +129,5 @@ impl State {
 
 pub trait Evaluate<T> {
     /// 与えられた状態のもとで自身を評価します。
-    fn evaluate(&self, state: &State) -> T;
+    fn evaluate(&self, state: State) -> (T, State);
 }

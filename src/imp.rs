@@ -31,17 +31,32 @@ pub enum Aexp {
 }
 
 impl Evaluate<Number> for Aexp {
-    fn evaluate(&self, state: &State) -> Number {
+    fn evaluate(&self, state: State) -> (Number, State) {
         match &self {
-            Aexp::N(n) => n.0.into(),
-            Aexp::Loc(var) => state
-                .get(var)
-                .as_ref()
-                .expect(format!("variable {} is undefined", var).as_str())
-                .to_owned(),
-            Aexp::Add(left, right) => (left.evaluate(&state).0 + right.evaluate(&state).0).into(),
-            Aexp::Sub(left, right) => (left.evaluate(&state).0 - right.evaluate(&state).0).into(),
-            Aexp::Mul(left, right) => (left.evaluate(&state).0 * right.evaluate(&state).0).into(),
+            Aexp::N(n) => (n.to_owned(), state),
+            Aexp::Loc(var) => (
+                state
+                    .get(var)
+                    .as_ref()
+                    .expect(format!("variable {} is undefined", var).as_str())
+                    .to_owned(),
+                state,
+            ),
+            Aexp::Add(left, right) => {
+                let (left, state) = left.evaluate(state);
+                let (right, state) = right.evaluate(state);
+                (left + right, state)
+            }
+            Aexp::Sub(left, right) => {
+                let (left, state) = left.evaluate(state);
+                let (right, state) = right.evaluate(state);
+                (left - right, state)
+            }
+            Aexp::Mul(left, right) => {
+                let (left, state) = left.evaluate(state);
+                let (right, state) = right.evaluate(state);
+                (left * right, state)
+            }
         }
     }
 }
@@ -103,8 +118,8 @@ impl Bexp {
 }
 
 impl Evaluate<Truth> for Bexp {
-    fn evaluate(&self, state: &State) -> Truth {
-        self.bexp.evaluate(&state)
+    fn evaluate(&self, state: State) -> (Truth, State) {
+        self.bexp.evaluate(state)
     }
 }
 
@@ -124,31 +139,47 @@ enum BexpImpl {
     /// 論理和 `b_0 or b_1`
     Or(Box<BexpImpl>, Box<BexpImpl>),
 
-    /// 短絡評価のテスト用（evaluates すると panic する）
+    /// 短絡評価のテスト用（evaluate すると panic する）
     #[allow(dead_code)]
     Dummy,
 }
 
 impl Evaluate<Truth> for BexpImpl {
-    fn evaluate(&self, state: &State) -> Truth {
+    fn evaluate(&self, state: State) -> (Truth, State) {
         match &self {
-            BexpImpl::T(Truth(true)) => Truth(true),
-            BexpImpl::T(Truth(false)) => Truth(false),
-            BexpImpl::Eq(left, right) if left.evaluate(&state) == right.evaluate(&state) => {
-                Truth(true)
+            BexpImpl::T(Truth(true)) => (Truth(true), state),
+            BexpImpl::T(Truth(false)) => (Truth(false), state),
+            BexpImpl::Eq(left, right) => {
+                let (left, state) = left.evaluate(state); // TODO: state が変わらないことは Aexp::evaluate の事後条件
+                let (right, state) = right.evaluate(state); // TODO: state が変わらないことは Aexp::evaluate の事後条件
+                (Truth(left == right), state)
             }
-            BexpImpl::Eq(_, _) => Truth(false),
-            BexpImpl::Le(left, right) if left.evaluate(&state) <= right.evaluate(&state) => {
-                Truth(true)
+            BexpImpl::Le(left, right) => {
+                let (left, state) = left.evaluate(state); // TODO: state が変わらないことは Aexp::evaluate の事後条件
+                let (right, state) = right.evaluate(state); // TODO: state が変わらないことは Aexp::evaluate の事後条件
+                (Truth(left <= right), state)
             }
-            BexpImpl::Le(_, _) => Truth(false),
-            BexpImpl::Not(b) if b.evaluate(&state).0 => Truth(false),
-            BexpImpl::Not(_) => Truth(true),
-            BexpImpl::And(left, _) if !left.evaluate(&state).0 => Truth(false),
-            BexpImpl::And(_, right) => right.evaluate(&state),
-            BexpImpl::Or(left, _) if left.evaluate(&state).0 => Truth(true),
-            BexpImpl::Or(_, right) => right.evaluate(&state),
-            _ => panic!(),
+            BexpImpl::Not(b) => {
+                let (b, state) = b.evaluate(state);
+                (!b, state)
+            }
+            BexpImpl::And(left, right) => {
+                let (left, state) = left.evaluate(state);
+                if !<Truth as Into<bool>>::into(left) {
+                    (Truth(false), state)
+                } else {
+                    right.evaluate(state)
+                }
+            }
+            BexpImpl::Or(left, right) => {
+                let (left, state) = left.evaluate(state);
+                if <Truth as Into<bool>>::into(left) {
+                    (Truth(true), state)
+                } else {
+                    right.evaluate(state)
+                }
+            }
+            _ => panic!(), // 短絡評価のテスト用
         }
     }
 }
@@ -172,7 +203,7 @@ pub enum Com {
 mod tests {
     use crate::{
         imp::{Aexp, BexpImpl},
-        Evaluate, State,
+        Evaluate, Number, State, Truth,
     };
 
     #[test]
@@ -183,58 +214,70 @@ mod tests {
         // ¬( 8 ≡ 3 + 5 )
         assert_ne!(
             Aexp::N(8.into()),
-            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into())))
+            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into()))),
         );
 
         // ¬( 5 + 3 ≡ 3 + 5 )
         assert_ne!(
             Aexp::Add(Box::new(Aexp::N(5.into())), Box::new(Aexp::N(3.into()))),
-            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into())))
+            Aexp::Add(Box::new(Aexp::N(3.into())), Box::new(Aexp::N(5.into()))),
         );
     }
 
     #[test]
     fn evaluate_number() {
+        // ⟨2, σ₀⟩ → ⟨2, σ₀⟩
         let state = State::init();
+        assert_eq!(
+            (Number(2), state.clone()),
+            Aexp::N(2.into()).evaluate(state),
+        );
 
-        // 〈2, σ〉 → 2
-        assert_eq!(2, Aexp::N(2.into()).evaluate(&state));
-
-        // 〈5, σ〉 → 5
-        assert_eq!(5, Aexp::N(5.into()).evaluate(&state));
+        // ⟨5, σ₀⟩ → ⟨5, σ₀⟩
+        let state = State::init();
+        assert_eq!(
+            (Number(5), state.clone()),
+            Aexp::N(5.into()).evaluate(state),
+        );
     }
 
     #[test]
     fn evaluate_variable() {
-        // 〈Init, σ_0〉 → 0
+        // σ := { (Init, 0) }
+        // ⟨Init, σ⟩ → ⟨0, σ⟩
         let state = State::from(&[("Init", 0.into())]);
-        assert_eq!(0, Aexp::Loc("Init".into()).evaluate(&state));
+        assert_eq!(
+            (Number(0), state.clone()),
+            Aexp::Loc("Init".into()).evaluate(state),
+        );
     }
 
     #[test]
     fn evaluate_addition() {
-        // 〈7 + 9, σ〉 → 16
+        // ⟨7 + 9, σ₀⟩ → ⟨16, σ₀⟩
         let state = State::init();
         assert_eq!(
-            16,
-            Aexp::Add(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
+            (Number(16), state.clone()),
+            Aexp::Add(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(state),
         );
 
-        // 〈Init + 5, σ_0〉 → 5
+        // σ := { (Init, 0) }
+        // ⟨Init + 5, σ⟩ → ⟨5, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            5,
+            (Number(5), state.clone()),
             Aexp::Add(
                 Box::new(Aexp::Loc("Init".into())),
                 Box::new(Aexp::N(5.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈(Init + 5) + (7 + 9), σ_0〉 → 21
+        // σ := { (Init, 0) }
+        // ⟨(Init + 5) + (7 + 9), σ⟩ → ⟨21, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            21,
+            (Number(21), state.clone()),
             Aexp::Add(
                 Box::new(Aexp::Add(
                     Box::new(Aexp::Loc("Init".into())),
@@ -245,34 +288,36 @@ mod tests {
                     Box::new(Aexp::N(9.into()))
                 )),
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_subtraction() {
-        // 〈7 - 9, σ〉 → -2
+        // ⟨7 - 9, σ₀⟩ → ⟨-2, σ₀⟩
         let state = State::init();
         assert_eq!(
-            -2,
-            Aexp::Sub(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
+            (Number(-2), state.clone()),
+            Aexp::Sub(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(state),
         );
 
-        // 〈Init - 5, σ_0〉 → -5
+        // σ := { (Init, 0) }
+        // ⟨Init - 5, σ⟩ → ⟨-5, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            -5,
+            (Number(-5), state.clone()),
             Aexp::Sub(
                 Box::new(Aexp::Loc("Init".into())),
                 Box::new(Aexp::N(5.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈(Init - 5) - (7 - 9), σ_0〉 → -3
+        // σ := { (Init, 0) }
+        // ⟨(Init - 5) - (7 - 9), σ⟩ → ⟨-3, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            -3,
+            (Number(-3), state.clone()),
             Aexp::Sub(
                 Box::new(Aexp::Sub(
                     Box::new(Aexp::Loc("Init".into())),
@@ -283,34 +328,36 @@ mod tests {
                     Box::new(Aexp::N(9.into()))
                 )),
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_multiplication() {
-        // 〈7 * 9, σ〉 → 63
+        // ⟨7 * 9, σ₀⟩ → ⟨63, σ₀⟩
         let state = State::init();
         assert_eq!(
-            63,
-            Aexp::Mul(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(&state),
+            (Number(63), state.clone()),
+            Aexp::Mul(Box::new(Aexp::N(7.into())), Box::new(Aexp::N(9.into()))).evaluate(state),
         );
 
-        // 〈Init * 5, σ_0〉 → 0
+        // σ := { (Init, 0) }
+        // ⟨Init * 5, σ⟩ → ⟨0, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            0,
+            (Number(0), state.clone()),
             Aexp::Mul(
                 Box::new(Aexp::Loc("Init".into())),
                 Box::new(Aexp::N(5.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈(Init * 5) * (7 * 9), σ_0〉 → 0
+        // σ := { (Init, 0) }
+        // ⟨(Init * 5) * (7 * 9), σ⟩ → ⟨0, σ⟩
         let state = State::from(&[("Init", 0.into())]);
         assert_eq!(
-            0,
+            (Number(0), state.clone()),
             Aexp::Mul(
                 Box::new(Aexp::Mul(
                     Box::new(Aexp::Loc("Init".into())),
@@ -321,161 +368,154 @@ mod tests {
                     Box::new(Aexp::N(9.into()))
                 )),
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_truth() {
+        // ⟨true, σ₀⟩ → ⟨true, σ₀⟩
         let state = State::init();
+        assert_eq!(
+            (Truth(true), state.clone()),
+            BexpImpl::T(true.into()).evaluate(state),
+        );
 
-        // 〈true, σ〉 → true
-        assert_eq!(true, BexpImpl::T(true.into()).evaluate(&state),);
-
-        // 〈false, σ〉 → false
-        assert_eq!(false, BexpImpl::T(false.into()).evaluate(&state),);
+        // ⟨false, σ₀⟩ → ⟨false, σ₀⟩
+        let state = State::init();
+        assert_eq!(
+            (Truth(false), state.clone()),
+            BexpImpl::T(false.into()).evaluate(state),
+        );
     }
 
     #[test]
     fn evaluate_equality() {
+        // ⟨0 = 0, σ₀⟩ → ⟨true, σ₀⟩
         let state = State::init();
-
-        // 〈0 = 0, σ〉 → true
         assert_eq!(
-            true,
-            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
+            (Truth(true), state.clone()),
+            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(state),
         );
 
-        // 〈0 = 1, σ〉 → false
+        // ⟨0 = 1, σ₀⟩ → ⟨false, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            false,
-            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
+            (Truth(false), state.clone()),
+            BexpImpl::Eq(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(state),
         )
     }
 
     #[test]
     fn evaluate_less_than_or_equal() {
+        // ⟨0 <= 0, σ₀⟩ → ⟨true, σ₀⟩
         let state = State::init();
-
-        // 〈0 <= 0, σ〉 → true
         assert_eq!(
-            true,
-            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(&state),
+            (Truth(true), state.clone()),
+            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(0.into())).evaluate(state),
         );
 
-        // 〈0 <= 1, σ〉 → true
+        // ⟨0 <= 1, σ₀⟩ → ⟨true, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            true,
-            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(&state),
+            (Truth(true), state.clone()),
+            BexpImpl::Le(Aexp::N(0.into()), Aexp::N(1.into())).evaluate(state),
         );
 
-        // 〈1 <= 0, σ〉 → false
+        // ⟨1 <= 0, σ₀⟩ → ⟨false, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            false,
-            BexpImpl::Le(Aexp::N(1.into()), Aexp::N(0.into())).evaluate(&state),
+            (Truth(false), state.clone()),
+            BexpImpl::Le(Aexp::N(1.into()), Aexp::N(0.into())).evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_not() {
+        // ⟨not true, σ₀⟩ → ⟨false, σ₀⟩
         let state = State::init();
-
-        // 〈not true, σ〉 → false
         assert_eq!(
-            false,
-            BexpImpl::Not(Box::new(BexpImpl::T(true.into()))).evaluate(&state),
+            (Truth(false), state.clone()),
+            BexpImpl::Not(Box::new(BexpImpl::T(true.into()))).evaluate(state),
         );
 
-        // 〈not false, σ〉 → true
+        // ⟨not false, σ₀⟩ → ⟨true, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            true,
-            BexpImpl::Not(Box::new(BexpImpl::T(false.into()))).evaluate(&state),
+            (Truth(true), state.clone()),
+            BexpImpl::Not(Box::new(BexpImpl::T(false.into()))).evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_and() {
+        // ⟨false and b₁, σ₀⟩ → ⟨false, σ₀⟩
         let state = State::init();
-
-        // 〈false and b_1, σ〉 → false
         assert_eq!(
-            false,
+            (Truth(false), state.clone()),
             BexpImpl::And(
                 Box::new(BexpImpl::T(false.into())),
                 Box::new(BexpImpl::Dummy),
             )
-            .evaluate(&state),
-        );
-        assert_eq!(
-            false,
-            BexpImpl::And(
-                Box::new(BexpImpl::T(false.into())),
-                Box::new(BexpImpl::Dummy),
-            )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈true and false, σ〉 → false
+        // ⟨true and false, σ₀⟩ → ⟨false, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            false,
+            (Truth(false), state.clone()),
             BexpImpl::And(
                 Box::new(BexpImpl::T(true.into())),
                 Box::new(BexpImpl::T(false.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈true and true, σ〉 → true
+        // ⟨true and true, σ₀⟩ → ⟨true, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            true,
+            (Truth(true), state.clone()),
             BexpImpl::And(
                 Box::new(BexpImpl::T(true.into())),
                 Box::new(BexpImpl::T(true.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
     }
 
     #[test]
     fn evaluate_or() {
+        // ⟨true or b₁, σ₀⟩ → ⟨true, σ₀⟩
         let state = State::init();
-
-        // 〈true or b_1, σ〉 → true
         assert_eq!(
-            true,
+            (Truth(true), state.clone()),
             BexpImpl::Or(
                 Box::new(BexpImpl::T(true.into())),
                 Box::new(BexpImpl::Dummy),
             )
-            .evaluate(&state),
-        );
-        assert_eq!(
-            true,
-            BexpImpl::Or(
-                Box::new(BexpImpl::T(true.into())),
-                Box::new(BexpImpl::Dummy),
-            )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈false or true, σ〉 → true
+        // ⟨false or true, σ₀⟩ → ⟨true, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            true,
+            (Truth(true), state.clone()),
             BexpImpl::Or(
                 Box::new(BexpImpl::T(false.into())),
                 Box::new(BexpImpl::T(true.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
 
-        // 〈false or false, σ〉 → false
+        // ⟨false or false, σ₀⟩ → ⟨false, σ₀⟩
+        let state = State::init();
         assert_eq!(
-            false,
+            (Truth(false), state.clone()),
             BexpImpl::Or(
                 Box::new(BexpImpl::T(false.into())),
                 Box::new(BexpImpl::T(false.into()))
             )
-            .evaluate(&state),
+            .evaluate(state),
         );
     }
 }
