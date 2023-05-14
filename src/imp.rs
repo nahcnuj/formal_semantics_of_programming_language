@@ -13,7 +13,7 @@ use crate::{Evaluate, Execute, Number, State, Truth, VarName};
 pub struct AST(Com);
 
 /// 算術式
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Aexp {
     /// 整数 n
     N(Number),
@@ -59,7 +59,7 @@ impl Evaluate<Number> for Aexp {
 }
 
 /// ブール式
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bexp {
     bexp: BexpImpl,
 }
@@ -121,7 +121,7 @@ impl Evaluate<Truth> for Bexp {
 }
 
 /// ブール式
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum BexpImpl {
     /// 真偽値 `true`, `false`
     T(Truth),
@@ -182,7 +182,7 @@ impl Evaluate<Truth> for BexpImpl {
 }
 
 /// コマンド
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Com {
     /// 基礎コマンド
     Skip,
@@ -198,41 +198,56 @@ pub enum Com {
 
 impl Execute for Com {
     fn execute(&self, state: State) -> (Option<Self>, State) {
-        match &self {
-            Com::Skip => (None, state),
-            Com::Subst(var, a) => {
-                let (a, state) = a.evaluate(state);
-                (None, state.update_variable(var, a))
-            }
-            Com::Seq(c_0, c_1) => {
-                let state = c_0.execute(state).1;
-                c_1.execute(state)
-            }
-            Com::If(b, c_0, c_1) => {
-                let (b, state) = b.evaluate(state);
-                let c = if b.into() { c_0 } else { c_1 };
-                c.execute(state)
-            }
-            Com::While(b, c) => {
-                // ⟨b, σ⟩ → ⟨t, σ⟩
-                let (Truth(t), state) = b.evaluate(state);
+        let boxed_self = Box::new(self.clone());
 
-                if t {
-                    // ⟨b, σ⟩ → ⟨true, σ⟩  ⟨c, σ⟩ → ⟨(), σ''⟩  ⟨while b do c, σ''⟩ → ⟨(), σ'⟩
-                    // ----------------------------------------------------------------------
-                    //                      ⟨while b do c, σ⟩ → ⟨(), σ'⟩
-
-                    let (None, state) = c.execute(state) else { panic!() };
-                    self.execute(state)
-                } else {
-                    //     ⟨b, σ⟩ → ⟨false, σ⟩
-                    // ---------------------------
-                    // ⟨while b do c, σ⟩ → ⟨(), σ⟩
-
-                    (None, state)
+        let mut cmd = self.clone();
+        let mut state = state;
+        while {
+            let (rest, new_state) = match &cmd {
+                Com::Skip => (None, state),
+                Com::Subst(var, a) => {
+                    let (a, state) = a.evaluate(state);
+                    (None, state.update_variable(&var, a))
                 }
+                Com::Seq(c_0, c_1) => {
+                    let (None, state) = c_0.execute(state) else { panic!() };
+                    (Some(c_1), state)
+                }
+                Com::If(b, c_0, c_1) => {
+                    let (b, state) = b.evaluate(state);
+                    let c = if b.into() { c_0 } else { c_1 };
+                    (Some(c), state)
+                }
+                Com::While(b, c) => {
+                    // ⟨b, σ⟩ → ⟨t, σ⟩
+                    let (Truth(t), state) = b.evaluate(state);
+
+                    if t {
+                        // ⟨b, σ⟩ → ⟨true, σ⟩  ⟨c, σ⟩ → ⟨(), σ''⟩  ⟨while b do c, σ''⟩ → ⟨(), σ'⟩
+                        // ----------------------------------------------------------------------
+                        //                      ⟨while b do c, σ⟩ → ⟨(), σ'⟩
+
+                        let (None, state) = c.execute(state) else { panic!() };
+                        (Some(&boxed_self), state)
+                    } else {
+                        //     ⟨b, σ⟩ → ⟨false, σ⟩
+                        // ---------------------------
+                        // ⟨while b do c, σ⟩ → ⟨(), σ⟩
+
+                        (None, state)
+                    }
+                }
+            };
+            state = new_state;
+
+            if let Some(rest) = rest {
+                cmd = rest.as_ref().clone();
+                true
+            } else {
+                false
             }
-        }
+        } {}
+        (None, state)
     }
 }
 
@@ -619,18 +634,21 @@ mod tests {
         )
         .execute(State::from(&[("X", 0.into())])) else { panic!() };
         assert_eq!(&Some(Number(4)), state.get(&"X".into()));
+    }
 
-        // // 素朴に再帰で実装しているため、以下はスタックが溢れる。
-        // // σ := { (X, 0) }
-        // // ⟨while X <= 999_999 do X := X + 1, σ⟩ →* ⟨(), σ[1_000_000/X]⟩
-        // let (None, state) = Com::While(
-        //     Bexp::le(Aexp::Loc("X".into()), Aexp::N(999_999.into())),
-        //     Box::new(Com::Subst(
-        //         "X".into(),
-        //         Aexp::Add(Box::new(Aexp::Loc("X".into())), Box::new(Aexp::N(1.into()))),
-        //     )),
-        // )
-        // .execute(State::from(&[("X", 0.into())])) else { panic!() };
-        // assert_eq!(&Some(Number(1_000_000)), state.get(&"X".into()));
+    #[test]
+    #[ignore = "it takes long time"]
+    fn execute_long_while_loop() {
+        // σ := { (X, 0) }
+        // ⟨while X <= 999_999 do X := X + 1, σ⟩ →* ⟨(), σ[1_000_000/X]⟩
+        let (None, state) = Com::While(
+            Bexp::le(Aexp::Loc("X".into()), Aexp::N(999_999.into())),
+            Box::new(Com::Subst(
+                "X".into(),
+                Aexp::Add(Box::new(Aexp::Loc("X".into())), Box::new(Aexp::N(1.into()))),
+            )),
+        )
+        .execute(State::from(&[("X", 0.into())])) else { panic!() };
+        assert_eq!(&Some(Number(1_000_000)), state.get(&"X".into()));
     }
 }
