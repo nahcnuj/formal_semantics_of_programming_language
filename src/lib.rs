@@ -132,11 +132,31 @@ impl State {
     fn get(&self, var: &VarName) -> &Option<Number> {
         self.0.get(var).unwrap_or(&None)
     }
+
+    /// 変数 var の値を value に置き換えた状態を生成します。
+    fn update_variable(mut self, var: &VarName, value: Number) -> Self {
+        let vars = &mut self.0;
+        if let Some(v) = vars.get_mut(&var) {
+            *v = Some(value);
+        } else {
+            vars.insert(var.to_owned(), Some(value));
+        }
+        self
+    }
 }
 
 pub trait Evaluate<T> {
     /// 与えられた状態のもとで自身を評価します。
+    /// 評価結果と評価後の状態の組を返します。
     fn evaluate(&self, state: State) -> (T, State);
+}
+
+pub trait Execute {
+    /// 与えられた状態のもとで自身を実行します。
+    /// 未実行のコマンドと実行後の状態の組を返します。
+    fn execute(&self, state: State) -> (Option<Self>, State)
+    where
+        Self: Sized;
 }
 
 pub mod imp;

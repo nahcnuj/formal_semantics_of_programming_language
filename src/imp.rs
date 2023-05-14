@@ -6,7 +6,7 @@
 //! Com  ::= "skip" | VarName ":=" Aexp | Com ";" Com | "if" Bexp "then" Com "else" Com | "while" Bexp "do" Com
 //! ```
 
-use crate::{Evaluate, Number, State, Truth, VarName};
+use crate::{Evaluate, Execute, Number, State, Truth, VarName};
 
 /// プログラミング言語 IMP の抽象構文木 (Abstract Syntax Tree)
 #[derive(Debug, PartialEq)]
@@ -196,11 +196,51 @@ pub enum Com {
     While(Bexp, Box<Com>),
 }
 
+impl Execute for Com {
+    fn execute(&self, state: State) -> (Option<Self>, State) {
+        match &self {
+            Com::Skip => (None, state),
+            Com::Subst(var, a) => {
+                let (a, state) = a.evaluate(state);
+                (None, state.update_variable(var, a))
+            }
+            Com::Seq(c_0, c_1) => {
+                let state = c_0.execute(state).1;
+                c_1.execute(state)
+            }
+            Com::If(b, c_0, c_1) => {
+                let (b, state) = b.evaluate(state);
+                let c = if b.into() { c_0 } else { c_1 };
+                c.execute(state)
+            }
+            Com::While(b, c) => {
+                // ⟨b, σ⟩ → ⟨t, σ⟩
+                let (Truth(t), state) = b.evaluate(state);
+
+                if t {
+                    // ⟨b, σ⟩ → ⟨true, σ⟩  ⟨c, σ⟩ → ⟨(), σ''⟩  ⟨while b do c, σ''⟩ → ⟨(), σ'⟩
+                    // ----------------------------------------------------------------------
+                    //                      ⟨while b do c, σ⟩ → ⟨(), σ'⟩
+
+                    let (None, state) = c.execute(state) else { panic!() };
+                    self.execute(state)
+                } else {
+                    //     ⟨b, σ⟩ → ⟨false, σ⟩
+                    // ---------------------------
+                    // ⟨while b do c, σ⟩ → ⟨(), σ⟩
+
+                    (None, state)
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        imp::{Aexp, BexpImpl},
-        Evaluate, Number, State, Truth,
+        imp::{Aexp, Bexp, BexpImpl, Com},
+        Evaluate, Execute, Number, State, Truth,
     };
 
     #[test]
@@ -225,17 +265,11 @@ mod tests {
     fn evaluate_number() {
         // ⟨2, σ₀⟩ → ⟨2, σ₀⟩
         let state = State::init();
-        assert_eq!(
-            (Number(2), state.clone()),
-            Aexp::N(2.into()).evaluate(state),
-        );
+        assert_eq!((Number(2), state.clone()), Aexp::N(2.into()).evaluate(state),);
 
         // ⟨5, σ₀⟩ → ⟨5, σ₀⟩
         let state = State::init();
-        assert_eq!(
-            (Number(5), state.clone()),
-            Aexp::N(5.into()).evaluate(state),
-        );
+        assert_eq!((Number(5), state.clone()), Aexp::N(5.into()).evaluate(state),);
     }
 
     #[test]
@@ -514,5 +548,89 @@ mod tests {
             )
             .evaluate(state),
         );
+    }
+
+    #[test]
+    fn execute_skip() {
+        // ⟨skip, σ₀⟩ → ⟨(), σ₀⟩
+        let before = State::init();
+        let (None, after) = Com::Skip.execute(before.clone()) else { panic!() };
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn execute_substitution() {
+        // ⟨X := 5, σ₀⟩ →* ⟨(), σ₀[5/X]⟩
+        let (None, state) = Com::Subst("X".into(), Aexp::N(5.into())).execute(State::init()) else { panic!() };
+        assert_eq!(&Some(Number(5)), state.get(&"X".into()));
+    }
+
+    #[test]
+    fn execute_sequence() {
+        // ⟨X := 5 ; Y := 3, σ₀⟩ →* ⟨(), σ₀[5/X][3/Y]⟩
+        let (None, state) = Com::Seq(
+            Box::new(Com::Subst("X".into(), Aexp::N(5.into()))),
+            Box::new(Com::Subst("Y".into(), Aexp::N(3.into()))),
+        )
+        .execute(State::init()) else { panic!() };
+        assert_eq!(&Some(Number(5)), state.get(&"X".into()));
+        assert_eq!(&Some(Number(3)), state.get(&"Y".into()));
+    }
+
+    #[test]
+    fn execute_if_command() {
+        // ⟨if true then X := 5 else X := 3, σ₀⟩ →* ⟨(), σ₀[5/X]⟩
+        let (None, state) = Com::If(
+            Bexp::truth(true),
+            Box::new(Com::Subst("X".into(), Aexp::N(5.into()))),
+            Box::new(Com::Subst("X".into(), Aexp::N(3.into()))),
+        )
+        .execute(State::init()) else { panic!() };
+        assert_eq!(&Some(Number(5)), state.get(&"X".into()));
+
+        // ⟨if false then X := 5 else X := 3, σ₀⟩ →* ⟨(), σ₀[3/X]⟩
+        let (None, state) = Com::If(
+            Bexp::truth(false),
+            Box::new(Com::Subst("X".into(), Aexp::N(5.into()))),
+            Box::new(Com::Subst("X".into(), Aexp::N(3.into()))),
+        )
+        .execute(State::init()) else { panic!() };
+        assert_eq!(&Some(Number(3)), state.get(&"X".into()));
+    }
+
+    #[test]
+    fn execute_while_loop() {
+        // ⟨while false do X := 5, σ₀⟩ →* ⟨(), σ₀⟩
+        let (None, state) = Com::While(
+            Bexp::truth(false),
+            Box::new(Com::Subst("X".into(), Aexp::N(5.into()))),
+        )
+        .execute(State::init()) else { panic!() };
+        assert_eq!(&None, state.get(&"X".into()));
+
+        // σ := { (X, 0) }
+        // ⟨while X <= 3 do X := X + 1, σ⟩ →* ⟨(), σ[4/X]⟩
+        let (None, state) = Com::While(
+            Bexp::le(Aexp::Loc("X".into()), Aexp::N(3.into())),
+            Box::new(Com::Subst(
+                "X".into(),
+                Aexp::Add(Box::new(Aexp::Loc("X".into())), Box::new(Aexp::N(1.into()))),
+            )),
+        )
+        .execute(State::from(&[("X", 0.into())])) else { panic!() };
+        assert_eq!(&Some(Number(4)), state.get(&"X".into()));
+
+        // // 素朴に再帰で実装しているため、以下はスタックが溢れる。
+        // // σ := { (X, 0) }
+        // // ⟨while X <= 999_999 do X := X + 1, σ⟩ →* ⟨(), σ[1_000_000/X]⟩
+        // let (None, state) = Com::While(
+        //     Bexp::le(Aexp::Loc("X".into()), Aexp::N(999_999.into())),
+        //     Box::new(Com::Subst(
+        //         "X".into(),
+        //         Aexp::Add(Box::new(Aexp::Loc("X".into())), Box::new(Aexp::N(1.into()))),
+        //     )),
+        // )
+        // .execute(State::from(&[("X", 0.into())])) else { panic!() };
+        // assert_eq!(&Some(Number(1_000_000)), state.get(&"X".into()));
     }
 }
