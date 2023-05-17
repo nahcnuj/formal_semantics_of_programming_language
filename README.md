@@ -1,23 +1,23 @@
 ｢プログラミング言語の形式的意味論入門」（丸善出版）に登場するプログラミング言語の、意味論の Rust による実装
 
-* src/imp.rs : $`\mathbf{IMP}`$
+- src/imp.rs : $`\mathbf{IMP}`$
 
 ## 形式検証
 
 TODO
 
-参考：[Rustの形式検証ツールCreusotを触ってみる](https://zenn.dev/kk/articles/20230213_creusot_intro)
+参考：[Rust の形式検証ツール Creusot を触ってみる](https://zenn.dev/kk/articles/20230213_creusot_intro)
 
 ## 環境構築メモ
 
 ### WSL 2 + Docker で GUI アプリ
 
-[DockerからGUIを使ってみよう \| インフォメーション・ディベロプメント](https://www.idnet.co.jp/column/page_229.html)
+[Docker から GUI を使ってみよう \| インフォメーション・ディベロプメント](https://www.idnet.co.jp/column/page_229.html)
 
 ### WSL 2 の Ubuntu 22.04 で root-less に Docker を動かす
 
-* [DockerをRootlessモードで利用する](https://zenn.dev/nemolize/articles/3cec197e5f5ec8)
-* [Run the Docker daemon as a non\-root user \(Rootless mode\) \| Docker Documentation](https://docs.docker.com/engine/security/rootless/)
+- [Docker を Rootless モードで利用する](https://zenn.dev/nemolize/articles/3cec197e5f5ec8)
+- [Run the Docker daemon as a non\-root user \(Rootless mode\) \| Docker Documentation](https://docs.docker.com/engine/security/rootless/)
 
 Docker デーモンを停止
 
@@ -153,12 +153,12 @@ $ echo nameserver 8.8.8.8 | sudo tee -a /etc/resolv.conf
 $ docker run --rm -d -p 8080:80 nginx
 Unable to find image 'nginx:latest' locally
 latest: Pulling from library/nginx
-9e3ea8720c6d: Pull complete 
-bf36b6466679: Pull complete 
-15a97cf85bb8: Pull complete 
-9c2d6be5a61d: Pull complete 
-6b7e4a5c7c7a: Pull complete 
-8db4caa19df8: Pull complete 
+9e3ea8720c6d: Pull complete
+bf36b6466679: Pull complete
+15a97cf85bb8: Pull complete
+9c2d6be5a61d: Pull complete
+6b7e4a5c7c7a: Pull complete
+8db4caa19df8: Pull complete
 Digest: sha256:480868e8c8c797794257e2abd88d0f9a8809b2fe956cbfbc05dcc0bca1f7cd43
 Status: Downloaded newer image for nginx:latest
 9d7cbe18fa4dd880b662538b5554df73b8f81931ed2c15fb19b87aa10daa3908
@@ -191,3 +191,7 @@ $
 ```
 
 ### Creusot
+
+```console
+$ cargo install --git https://github.com/xldenis/creusot
+```
