@@ -6,34 +6,40 @@ ARG CREUSOT_REV=7c8f33dcd9a7d734e95ec106b47107baa4dc1f72
 
 RUN sed -i 's@archive.ubuntu.com@ftp.jaist.ac.jp/pub/Linux@g' /etc/apt/sources.list
 
-RUN apt-get update \
-    && apt-get install -y \
-        bubblewrap \
-        coqide \
-        curl \
-        gcc \
-        libcairo2-dev \
-        libexpat1-dev \
-        libgmp-dev \
-        libgtk-3-dev \
-        libgtksourceview-3.0-dev \
-        make \
-        patch \
-        perl \
-        pkg-config \
-        unzip \
-    && apt-get clean \
-    && rm -r /var/lib/apt/lists/*
+RUN <<EOF
+apt-get update
+apt-get install -y \
+    bubblewrap \
+    coqide \
+    curl \
+    gcc \
+    libcairo2-dev \
+    libexpat1-dev \
+    libgmp-dev \
+    libgtk-3-dev \
+    libgtksourceview-3.0-dev \
+    make \
+    patch \
+    perl \
+    pkg-config \
+    unzip
+apt-get clean
+rm -r /var/lib/apt/lists/*
+EOF
 
-RUN curl -sL "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" -o /tmp/opam \
-    && install /tmp/opam /usr/local/bin/ \
-    && rm /tmp/opam
+RUN <<EOF
+curl -sL "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-x86_64-linux" -o /tmp/opam
+install /tmp/opam /usr/local/bin/
+rm /tmp/opam
+EOF
 
 WORKDIR /workspace
 
-RUN opam init -y --disable-sandboxing \
-    && eval $(opam env) \
-    && opam switch create ${OCAML_VERSION}
+RUN <<EOF
+opam init -y --disable-sandboxing
+eval $(opam env)
+opam switch create ${OCAML_VERSION}
+EOF
 
 # eval $(opam env)
 ENV OPAM_SWITCH_PREFIX=/root/.opam/${OCAML_VERSION}
@@ -44,20 +50,24 @@ ENV MANPATH=${OPAM_SWITCH_PREFIX}/man
 ENV PATH=${OPAM_SWITCH_PREFIX}/bin:$PATH
 
 # install Why3
-RUN opam install -y \
-        lablgtk3 \
-        lablgtk3-sourceview3 \
-        ocamlgraph \
-        why3 \
-        why3-ide \
-        why3-coq
-RUN why3 config detect
+RUN <<EOF
+opam install -y \
+    lablgtk3 \
+    lablgtk3-sourceview3 \
+    ocamlgraph \
+    why3 \
+    why3-ide \
+    why3-coq
+why3 config detect
+EOF
 
 # copy Creusot preludes
-RUN cd /tmp/ \
-    && curl -sL "https://github.com/xldenis/creusot/archive/${CREUSOT_REV}.zip" -o /tmp/creusot.zip \
-    && unzip /tmp/creusot.zip \
-    && cp -a /tmp/creusot-${CREUSOT_REV}/prelude /workspace/ \
-    && rm -rf /tmp/creusot.zip /tmp/creusot
+RUN <<EOF
+cd /tmp/
+curl -sL "https://github.com/xldenis/creusot/archive/${CREUSOT_REV}.zip" -o /tmp/creusot.zip
+unzip /tmp/creusot.zip
+cp -a /tmp/creusot-${CREUSOT_REV}/prelude /workspace/
+rm -rf /tmp/creusot.zip /tmp/creusot
+EOF
 
 ENTRYPOINT [ "why3", "-L", "/workspace/prelude" ]
