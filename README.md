@@ -4,7 +4,12 @@
 
 ## 形式検証
 
-TODO
+```console
+$ cargo creusot --output-file program.mlcfg
+$ docker compose run --rm why3 ide program.mlcfg
+$ docker compose run --rm why3 replay program
+ 1/1 (replay OK)
+```
 
 参考：[Rust の形式検証ツール Creusot を触ってみる](https://zenn.dev/kk/articles/20230213_creusot_intro)
 

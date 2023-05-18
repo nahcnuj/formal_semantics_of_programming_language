@@ -1,0 +1,19 @@
+(* shapes version: 6 *)
+aresolveaborrowed'mkc0afinalaa
+aresolveaborrowed'mkc1afinalab
+ain_boundsa+aint32'inta*aborrowed'mkc0afinalaaaint32'inta*aborrowed'mkc1afinalab
+integer overflow
+a=aint32'inta_0a+aint32'inta*aborrowed'mkc0afinalaaaint32'inta*aborrowed'mkc1afinalab
+a=a_0c1
+postcondition
+a=aint32'intc1a+aint32'inta*aborrowed'mkc0afinalaaaint32'inta*aborrowed'mkc1afinalab
+a=a^aac0
+a=a^abc1
+a=a^V1c1Aa=a^V0c0Aa=V9c1Ia=V9V8FIa=aint32'intV8a+aint32'intV6aint32'intV7FAain_boundsa+aint32'intV6aint32'intV7IaresolveV5Ia=V7a*V5FIaresolveV4Ia=V6a*V4FIa=V5aborrowed'mkc1afinalV3FIa=V4aborrowed'mkc0afinalV2FIa=V3V1FIa=V2V0FF
+VC for hello
+
+a58acf487fbdbb785f81862c64045b71 11H10
+a21b9f8d4399f986e956afe367620406 3H2H1H0
+46298cc639bb875441a27191ffd2a1ba 6H5H4H1H0
+31b63dad17e489400b1b39f708956eca 6H8H7H1H0
+220b3392875f11fb8a564b0c5f632558 6H9H8H7H1H0
