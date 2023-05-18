@@ -12,6 +12,8 @@ apt-get install -y \
     bubblewrap \
     coqide \
     curl \
+    dbus-x11 \
+    fcitx \
     gcc \
     libcairo2-dev \
     libexpat1-dev \
@@ -22,7 +24,8 @@ apt-get install -y \
     patch \
     perl \
     pkg-config \
-    unzip
+    unzip \
+    x11-xkb-utils
 apt-get clean
 rm -r /var/lib/apt/lists/*
 EOF
@@ -34,6 +37,30 @@ rm /tmp/opam
 EOF
 
 WORKDIR /workspace
+
+# キーボードを日本語配列に設定
+RUN <<EOF
+setxkbmap -layout jp
+sh -c "dbus-uuidgen > /var/lib/dbus/machine-id"
+cat <<- 'EOS' | tee -a ~/.profile
+	# Added by bash script from https://astherier.com/blog/2021/07/windows11-wsl2-wslg-japanese/
+	export GTK_IM_MODULE=fcitx
+	export QT_IM_MODULE=fcitx
+	export XMODIFIERS=@im=fcitx
+	export DefaultIMModule=fcitx
+	if [ $SHLVL = 1 ] ; then
+	  (fcitx-autostart > /dev/null 2>&1 &)
+	  xset -r 49  > /dev/null 2>&1
+	fi
+	# Added by bash script: end
+EOS
+EOF
+
+COPY --chmod=755 <<EOF /docker-entrypoint.sh
+#!/bin/bash
+source ~/.profile
+exec "\$@"
+EOF
 
 RUN <<EOF
 opam init -y --disable-sandboxing
@@ -66,8 +93,14 @@ RUN <<EOF
 cd /tmp/
 curl -sL "https://github.com/xldenis/creusot/archive/${CREUSOT_REV}.zip" -o /tmp/creusot.zip
 unzip /tmp/creusot.zip
-cp -a /tmp/creusot-${CREUSOT_REV}/prelude /workspace/
+mkdir -p ~/.local/src
+cp -a /tmp/creusot-${CREUSOT_REV} /root/.local/src/creusot
 rm -rf /tmp/creusot.zip /tmp/creusot
 EOF
+COPY --chmod=755 <<EOF /root/bin/why3
+#!/bin/bash
+${OPAM_SWITCH_PREFIX}/bin/why3 -L /root/.local/src/creusot/prelude "\$@"
+EOF
 
-ENTRYPOINT [ "why3", "-L", "/workspace/prelude" ]
+
+ENTRYPOINT [ "/docker-entrypoint.sh", "/root/bin/why3" ]

@@ -8,18 +8,20 @@ services:
       - type: "bind"
         source: "."
         target: "/workspace"
-      - type: "volume"
-        source: "creusot_prelude"
-        target: "/workspace/prelude"
       # WSLg
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - "/mnt/wslg:/mnt/wslg"
+      # 日本語入力
+      - "/run/user/1000/bus:/run/user/1000/bus"
     environment:
       # WSLg
       - "DISPLAY"
       - "WAYLAND_DISPLAY"
       - "XDG_RUNTIME_DIR"
       - "PULSE_SERVER"
-
-volumes:
-  creusot_prelude:
+      # 日本語入力
+      - "XMODIFIERS"
+      - "GTK_IM_MODULE"
+      - "QT_IM_MODULE"
+      - "DefaultIMModule=fcitx"
+      - "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
